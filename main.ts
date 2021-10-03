@@ -1,10 +1,12 @@
-import { App, Modal, Plugin, PluginSettingTab, Setting, ButtonComponent, ExtraButtonComponent, ObsidianProtocolData, TextComponent } from 'obsidian';
+import { normalizePath, App, Modal, Plugin, PluginSettingTab, Setting, ButtonComponent, ExtraButtonComponent, ObsidianProtocolData, TextComponent } from 'obsidian';
+import { Script, getScript } from './script';
 
 type UriEndpoint = string;
 
 interface UriSettings {
 	name: string;
 	endpoint: UriEndpoint;
+	script: Script;
 }
 
 interface UriScriptPluginSettings {
@@ -18,6 +20,10 @@ const DEFAULT_SETTINGS: UriScriptPluginSettings = {
 		'my-script': {
 			name: 'My Script',
 			endpoint: 'my-script',
+			script: {
+				path: 'test.js',
+				member: 'test::handler',
+			},
 		}
 	}
 }
@@ -32,6 +38,23 @@ export default class UriScriptPlugin extends Plugin {
 		await this.registerHandlers();
 
 		this.addSettingTab(new UriScriptSettingTab(this.app, this));
+
+		this.addCommand({
+			id: 'uri-script-test',
+			name: 'URI Script Test',
+			callback: () => {
+				const script: Script = {
+					path: normalizePath('test.js'),
+					member: 'test::handler',
+				};
+				getScript(script, this.app)
+				.then((handler) => {
+					handler({
+						foo: 'bar',
+					});
+				});
+			}
+		});
 	}
 
 	onunload() {
@@ -50,12 +73,16 @@ export default class UriScriptPlugin extends Plugin {
 	async registerHandlers() {
 		Object.values(this.settings.endpoints).forEach(async (uriSettings: UriSettings) => {
 			console.log('Registering endpoint: ', uriSettings);
-			this.registerObsidianProtocolHandler(uriSettings.endpoint, this.protocolHandler);
+			this.registerObsidianProtocolHandler(uriSettings.endpoint, this.protocolHandler.bind(this));
 		});
 	}
 
 	async protocolHandler(params: ObsidianProtocolData) {
-		console.log('Got params: ', params);
+		const endpoint: UriSettings = this.settings.endpoints[params.action];
+		getScript(endpoint.script, this.app)
+		.then((handler) => {
+			handler(params);
+		});
 	}
 }
 
@@ -105,6 +132,10 @@ class UriScriptSettingTab extends PluginSettingTab {
 									this.plugin.settings.endpoints[modal.endpoint] = {
 										name: modal.name,
 										endpoint: modal.endpoint,
+										script: {
+											path: modal.path,
+											member: modal.member,
+										},
 									};
 									await this.plugin.saveSettings();
 									this.display();
@@ -133,6 +164,10 @@ class UriScriptSettingTab extends PluginSettingTab {
 								this.plugin.settings.endpoints[modal.endpoint] = {
 									name: modal.name,
 									endpoint: modal.endpoint,
+									script: {
+										path: modal.path,
+										member: modal.member,
+									}
 								};
 								await this.plugin.saveSettings();
 								this.display();
@@ -148,6 +183,8 @@ class UriScriptSettingTab extends PluginSettingTab {
 class UriScriptSettingModal extends Modal {
 	name: string;
 	endpoint: UriEndpoint;
+	path: string;
+	member: string;
 	saved: boolean = false;
 
 	constructor(app: App, settings?: UriSettings) {
@@ -155,6 +192,8 @@ class UriScriptSettingModal extends Modal {
 		if (settings) {
 			this.name = settings.name;
 			this.endpoint = settings.endpoint;
+			this.path = settings.script.path;
+			this.member = settings.script.member;
 		}
 	}
 
@@ -191,6 +230,29 @@ class UriScriptSettingModal extends Modal {
 					});
 			});
 
+		new Setting(contentEl)
+			.setName('Path')
+			.setDesc('The path to the script file.')
+			.addText((text: TextComponent): TextComponent => {
+				return text
+					.setPlaceholder('my-script.js')
+					.setValue(this.path)
+					.onChange(async (value: string) => {
+						this.path = value;
+					});
+			});
+
+		new Setting(contentEl)
+			.setName('Member')
+			.setDesc('The member in the script to the handler.')
+			.addText((text: TextComponent): TextComponent => {
+				return text
+					.setPlaceholder('my-script::handler')
+					.setValue(this.member)
+					.onChange(async (value: string) => {
+						this.member = value;
+					});
+			});
 
 		let footerEl = contentEl.createDiv();
 
