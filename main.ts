@@ -41,17 +41,11 @@ export default class UriScriptPlugin extends Plugin {
 
 		this.addCommand({
 			id: 'uri-script-test',
-			name: 'URI Script Test',
+			name: 'Test',
 			callback: () => {
-				const script: Script = {
-					path: normalizePath('test.js'),
-					member: 'test::handler',
-				};
-				getScript(script, this.app)
-				.then((handler) => {
-					handler({
-						foo: 'bar',
-					});
+				this.protocolHandler({
+					action: 'test',
+					foo: 'bar',
 				});
 			}
 		});
@@ -81,7 +75,7 @@ export default class UriScriptPlugin extends Plugin {
 		const endpoint: UriSettings = this.settings.endpoints[params.action];
 		getScript(endpoint.script, this.app)
 		.then((handler) => {
-			handler(params);
+			handler(this.app, params);
 		});
 	}
 }
