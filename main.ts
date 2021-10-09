@@ -28,27 +28,51 @@ const DEFAULT_SETTINGS: UriScriptPluginSettings = {
 	}
 }
 
+function monkeyPatchConsole(plugin: Plugin) {
+	// @ts-ignore
+	if (!plugin.app.isMobile) {
+		return;
+	}
+
+	const logFile = `${plugin.manifest.dir}/logs.txt`;
+	const logs: string[] = [];
+	const logMessages = (prefix: string) => (...messages: unknown[]) => {
+		logs.push(`\n[${prefix}]`);
+		for (const message of messages) {
+			logs.push(String(message));
+		}
+		plugin.app.vault.adapter.write(logFile, logs.join(" "));
+	};
+
+	console.debug = logMessages("debug");
+	console.error = logMessages("error");
+	console.info = logMessages("info");
+	console.log = logMessages("log");
+	console.warn = logMessages("warn");
+}
+
 export default class UriScriptPlugin extends Plugin {
 	settings: UriScriptPluginSettings;
 
 	async onload() {
+		//monkeyPatchConsole(this);
 		console.log('loading plugin');
 
-		await this.loadSettings();
-		await this.registerHandlers();
+		//await this.loadSettings();
+		//await this.registerHandlers();
 
-		this.addSettingTab(new UriScriptSettingTab(this.app, this));
+		//this.addSettingTab(new UriScriptSettingTab(this.app, this));
 
-		this.addCommand({
-			id: 'uri-script-test',
-			name: 'Test',
-			callback: () => {
-				this.protocolHandler({
-					action: 'test',
-					foo: 'bar',
-				});
-			}
-		});
+		//this.addCommand({
+			//id: 'uri-script-test',
+			//name: 'Test',
+			//callback: () => {
+				//this.protocolHandler({
+					//action: 'dose',
+					//foo: 'bar',
+				//});
+			//}
+		//});
 	}
 
 	onunload() {
@@ -72,11 +96,24 @@ export default class UriScriptPlugin extends Plugin {
 	}
 
 	async protocolHandler(params: ObsidianProtocolData) {
+		console.log("calling protcol handler");
+		console.log(JSON.stringify(params));
 		const endpoint: UriSettings = this.settings.endpoints[params.action];
+		console.log("going to get script now...");
+		console.log(JSON.stringify(this.settings));
+		console.log(JSON.stringify(endpoint));
+
 		getScript(endpoint.script, this.app)
 		.then((handler) => {
-			handler(this.app, params);
+			console.log("got handler");
+			console.log(handler);
+			handler(params);
+		})
+		.catch((err) => {
+			console.error(err);
 		});
+
+		console.log("wtf");
 	}
 }
 

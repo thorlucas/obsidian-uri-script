@@ -18,10 +18,15 @@ export function getScriptMemberAccess(fullMemberPath: string): { basename: strin
 }
 
 export async function getScript(script: Script, app: App) {
+	console.log("in get script");
+	app.vault.adapter.write('log.md', 'in get script');
 	// @ts-ignore
 	const vaultPath = app.vault.adapter.getBasePath();
 	const file: TAbstractFile = app.vault.getAbstractFileByPath(script.path);
+	console.log(vaultPath);
+	console.log(file.path);
 	if (!file) {
+		console.log("nofile");
 		console.error(`failed to load file ${script.path}.`);
 		return;
 	}
@@ -35,7 +40,10 @@ export async function getScript(script: Script, app: App) {
 
 		// @ts-ignore
 		const scriptFile = await import(filePath);
-		if (!scriptFile || !scriptFile.default) return;
+		if (!scriptFile || !scriptFile.default) {
+			console.log("no script file");
+			return;
+		}
 
 		let scriptData = scriptFile.default;
 
